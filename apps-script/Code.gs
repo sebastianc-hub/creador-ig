@@ -21,12 +21,15 @@ const MODELOS = ['gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-flas
 const COLUMNAS = {
   ideas: ['id', 'creada', 'estado', 'titulo', 'pilar', 'gancho', 'guion', 'duracion_seg', 'estilo', 'visuales', 'por_que_funciona'],
   proyectos: ['id', 'creado', 'estado', 'idea_id', 'titulo', 'estilo', 'guion', 'archivo_id', 'mime', 'nombre_archivo', 'duracion', 'texto', 'error',
-              'video_id', 'caption', 'visuales', 'gancho'],
+              'video_id', 'caption', 'visuales', 'gancho',
+              'ig_container', 'ig_media_id', 'permalink', 'publicado_en'],
 };
 
 // Estados de un proyecto:
-//   transcribiendo → transcrito → por_editar → editando → listo (→ publicado, paso 4)
-//   y "error" / "error_video" cuando algo falla.
+//   transcribiendo → transcrito → por_editar → editando → listo → publicando → publicado
+//   y "error" / "error_video" / "error_publicar" cuando algo falla.
+
+const GRAPH = 'https://graph.facebook.com/v23.0';
 
 const SISTEMA = `Eres el estratega de contenido de Instagram de la marca descrita abajo.
 Propones ideas para Reels de 20 a 45 segundos que el dueño grabará SOLO CON SU VOZ
@@ -149,7 +152,8 @@ function doGet(e) {
     switch (p.accion) {
       case 'ping': {
         const k = claveGemini_();
-        return json_({ ok: true, gemini: !!k, clave: k ? k.slice(0, 4) + '…' + k.slice(-3) + ' (' + k.length + ')' : '' });
+        return json_({ ok: true, gemini: !!k, clave: k ? k.slice(0, 4) + '…' + k.slice(-3) + ' (' + k.length + ')' : '',
+                       instagram: PROPS.getProperty('IG_USERNAME') || '' });
       }
       case 'ideas':
         return json_(tabla_('ideas').reverse()); // las más nuevas primero
@@ -188,7 +192,7 @@ function doPost(e) {
       case 'subir_audio':
         return json_(subirAudio_(b));
       case 'estado_proyecto': { // teléfono: "Armar video" / "Rehacer"; PC: editando / error_video
-        const permitidos = ['por_editar', 'editando', 'error_video', 'transcrito'];
+        const permitidos = ['por_editar', 'editando', 'error_video', 'transcrito', 'listo'];
         if (!permitidos.includes(b.estado)) return json_({ error: 'Estado inválido' });
         const cambios = { estado: b.estado, error: b.error || '' };
         if (!actualizar_('proyectos', b.id, cambios)) return json_({ error: 'Grabación no encontrada' });
@@ -196,6 +200,12 @@ function doPost(e) {
       }
       case 'subir_video':
         return json_(subirVideo_(b));
+      case 'guardar_caption': {
+        if (!actualizar_('proyectos', b.id, { caption: String(b.caption || '').slice(0, 2200) })) return json_({ error: 'Grabación no encontrada' });
+        return json_({ ok: true });
+      }
+      case 'publicar':
+        return json_(pedirPublicacion_(b.id));
       case 'borrar_proyecto': {
         const pr = fila_('proyectos', b.id);
         if (!pr) return json_({ error: 'Grabación no encontrada' });
@@ -366,6 +376,123 @@ function redactarCaption_(pr) {
   const texto = preguntarIA_(sistema, 'Título: ' + pr.titulo + '\nGuion/transcripción: ' + (pr.texto || pr.guion));
   const ini = texto.indexOf('{'), fin = texto.lastIndexOf('}');
   return String(JSON.parse(texto.slice(ini, fin + 1)).caption || '').trim();
+}
+
+// ============================================================
+// Instagram (API oficial de Meta)
+// ============================================================
+
+/**
+ * Se corre UNA vez desde el editor. Pega el token de corta duración que te da el
+ * Explorador de la API Graph (con permisos instagram_basic, instagram_content_publish,
+ * pages_show_list, pages_read_engagement, business_management) y guarda lo necesario.
+ * Antes, en Propiedades del script: META_APP_ID y META_APP_SECRET.
+ */
+function conectarInstagram(tokenCorto) {
+  if (!tokenCorto) throw new Error('Pasa el token: conectarInstagram("EAAB...")');
+  const appId = PROPS.getProperty('META_APP_ID'), secreto = PROPS.getProperty('META_APP_SECRET');
+  if (!appId || !secreto) throw new Error('Faltan META_APP_ID y META_APP_SECRET en Propiedades del script');
+
+  const largo = graph_('GET', '/oauth/access_token', {
+    grant_type: 'fb_exchange_token', client_id: appId, client_secret: secreto, fb_exchange_token: tokenCorto,
+  }).access_token;
+
+  const paginas = graph_('GET', '/me/accounts', {
+    fields: 'id,name,access_token,instagram_business_account{id,username}', access_token: largo,
+  }).data || [];
+  const pag = paginas.find(p => p.instagram_business_account);
+  if (!pag) throw new Error('Ninguna de tus páginas de Facebook tiene una cuenta de Instagram profesional vinculada.');
+
+  PROPS.setProperties({
+    IG_USER_ID: pag.instagram_business_account.id,
+    IG_USERNAME: pag.instagram_business_account.username,
+    IG_TOKEN: pag.access_token, // token de página de larga duración: no caduca
+  });
+  Logger.log('Instagram conectado: @' + pag.instagram_business_account.username + ' (página "' + pag.name + '")');
+}
+
+function pedirPublicacion_(id) {
+  const pr = fila_('proyectos', id);
+  if (!pr) throw new Error('Grabación no encontrada');
+  if (!PROPS.getProperty('IG_TOKEN')) throw new Error('Instagram no está conectado todavía (función conectarInstagram).');
+  if (!pr.video_id) throw new Error('Este proyecto no tiene video');
+  if (!['listo', 'error_publicar'].includes(pr.estado)) throw new Error('El video no está listo para publicar');
+  asegurarColumnas_();
+
+  const ig = PROPS.getProperty('IG_USER_ID'), token = PROPS.getProperty('IG_TOKEN');
+  const base = { media_type: 'REELS', caption: pr.caption || '', share_to_feed: 'true', access_token: token };
+  let contenedor;
+  try {
+    // 1) Subida directa del archivo (no depende de que Drive sirva el video públicamente)
+    const c = graph_('POST', '/' + ig + '/media', Object.assign({ upload_type: 'resumable' }, base));
+    const bytes = DriveApp.getFileById(pr.video_id).getBlob().getBytes();
+    const r = UrlFetchApp.fetch(c.uri, {
+      method: 'post', contentType: 'application/octet-stream', payload: bytes, muteHttpExceptions: true,
+      headers: { Authorization: 'OAuth ' + token, offset: '0', file_size: String(bytes.length) },
+    });
+    const d = JSON.parse(r.getContentText() || '{}');
+    if (r.getResponseCode() !== 200 || !d.success) throw new Error('subida: ' + r.getContentText().slice(0, 200));
+    contenedor = c.id;
+  } catch (e1) {
+    // 2) Respaldo: que Meta descargue el video desde Drive
+    const url = 'https://drive.google.com/uc?export=download&id=' + pr.video_id;
+    contenedor = graph_('POST', '/' + ig + '/media', Object.assign({ video_url: url }, base)).id;
+  }
+
+  actualizar_('proyectos', id, { estado: 'publicando', ig_container: contenedor, error: '' });
+  ScriptApp.newTrigger('procesarPublicaciones').timeBased().after(45 * 1000).create();
+  return { ok: true, contenedor: contenedor };
+}
+
+/** Disparador: espera a que Meta procese el video y lo publica. Se reprograma si aún no termina. */
+function procesarPublicaciones() {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) return;
+  try {
+    for (const t of ScriptApp.getProjectTriggers()) {
+      if (t.getHandlerFunction() === 'procesarPublicaciones') ScriptApp.deleteTrigger(t);
+    }
+    const ig = PROPS.getProperty('IG_USER_ID'), token = PROPS.getProperty('IG_TOKEN');
+    let quedan = false;
+    for (const pr of tabla_('proyectos')) {
+      if (pr.estado !== 'publicando' || !pr.ig_container) continue;
+      try {
+        const st = graph_('GET', '/' + pr.ig_container, { fields: 'status_code,status', access_token: token });
+        if (st.status_code === 'FINISHED') {
+          const pub = graph_('POST', '/' + ig + '/media_publish', { creation_id: pr.ig_container, access_token: token });
+          let permalink = '';
+          try { permalink = graph_('GET', '/' + pub.id, { fields: 'permalink', access_token: token }).permalink || ''; } catch (_) {}
+          actualizar_('proyectos', pr.id, { estado: 'publicado', ig_media_id: pub.id, permalink: permalink, publicado_en: ahora_(), error: '' });
+        } else if (st.status_code === 'ERROR' || st.status_code === 'EXPIRED') {
+          actualizar_('proyectos', pr.id, { estado: 'error_publicar', error: 'Meta rechazó el video: ' + (st.status || st.status_code) });
+        } else {
+          quedan = true; // IN_PROGRESS
+        }
+      } catch (err) {
+        actualizar_('proyectos', pr.id, { estado: 'error_publicar', error: String(err.message || err).slice(0, 300) });
+      }
+    }
+    if (quedan) ScriptApp.newTrigger('procesarPublicaciones').timeBased().after(60 * 1000).create();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function graph_(metodo, ruta, params) {
+  const opciones = { method: metodo.toLowerCase(), muteHttpExceptions: true };
+  let url = GRAPH + ruta;
+  if (metodo === 'GET') {
+    url += '?' + Object.entries(params).map(([k, v]) => k + '=' + encodeURIComponent(v)).join('&');
+  } else {
+    opciones.payload = params;
+  }
+  const r = UrlFetchApp.fetch(url, opciones);
+  const d = JSON.parse(r.getContentText() || '{}');
+  if (r.getResponseCode() >= 400 || d.error) {
+    const e = d.error || {};
+    throw new Error('Meta: ' + (e.error_user_msg || e.message || r.getContentText().slice(0, 200)));
+  }
+  return d;
 }
 
 /** Agrega a la hoja las columnas que se hayan definido después de instalar. */

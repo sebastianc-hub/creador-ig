@@ -92,6 +92,8 @@
   audio { width:100%; height:40px; border-radius:10px; }
   .video { position:relative; width:min(100%, 300px); aspect-ratio:9/16; border-radius:14px; overflow:hidden; background:var(--blue-900); margin:4px auto 0; }
   .video iframe { position:absolute; inset:0; width:100%; height:100%; border:0; }
+  textarea.caption { width:100%; font:inherit; font-size:14px; line-height:1.5; color:var(--ink); background:var(--bg-suave); border:1.5px solid var(--line-fuerte); border-radius:12px; padding:12px; resize:vertical; }
+  .estado-publicando { color:var(--espera); font-weight:600; } .estado-error_publicar { color:var(--error); font-weight:600; }
   .estado-por_editar, .estado-editando { color:var(--espera); font-weight:600; } .estado-listo, .estado-publicado { color:var(--ok); font-weight:600; } .estado-error_video { color:var(--error); font-weight:600; }
   .oculto { display:none !important; }
 
@@ -227,8 +229,10 @@
 <script>
 const ESTILOS = { stock:"Clips de stock", ia:"Imágenes IA", texto:"Texto animado", propio:"Tu material" };
 const ESTADOS = { transcribiendo:"Transcribiendo…", transcrito:"Transcrito", error:"Error",
-  por_editar:"En cola para la PC", editando:"Armando video…", listo:"Video listo", error_video:"Falló el video", publicado:"Publicado" };
-const EN_PROCESO = ["transcribiendo", "por_editar", "editando"];
+  por_editar:"En cola para la PC", editando:"Armando video…", listo:"Video listo", error_video:"Falló el video",
+  publicando:"Publicando en Instagram…", publicado:"Publicado", error_publicar:"No se pudo publicar" };
+const EN_PROCESO = ["transcribiendo", "por_editar", "editando", "publicando"];
+let IG_USUARIO = "";
 let ideas = [], proyectos = [], filtro = "pendiente", sondeo = null;
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -274,7 +278,7 @@ $("#cfg-guardar").onclick = async () => {
   const prev = CFG; CFG = { url, token };
   $("#cfg-guardar").disabled = true; $("#cfg-aviso").textContent = "Probando…";
   try {
-    const p = await api("ping");
+    const p = await api("ping"); IG_USUARIO = p.instagram || "";
     localStorage.setItem("cfg", JSON.stringify(CFG)); fijarHash();
     $("#aviso").textContent = p.gemini ? `Conectado · clave Gemini ${p.clave}` : "Conectado, pero falta GEMINI_API_KEY en el script.";
     $("#config").classList.add("oculto"); $("#nav").classList.remove("oculto"); verTab("ideas"); cargar();
@@ -459,15 +463,18 @@ async function cargarProyectos() {
       ${p.estado === "por_editar" ? `<p class="nota">Se arma en cuanto la PC esté encendida con el Editor abierto.</p>` : ""}
       ${p.estado === "editando" ? `<p class="nota">La PC está trabajando. Tarda unos minutos.</p>` : ""}
       ${["error", "error_video"].includes(p.estado) ? `<p class="nota estado-error">${esc(p.error)}</p>` : ""}
-      ${p.estado === "listo" && p.video_id ? `
-        <div class="video"><iframe src="https://drive.google.com/file/d/${esc(p.video_id)}/preview" allow="autoplay; fullscreen" allowfullscreen></iframe></div>
-        ${p.caption ? `<div class="guion" id="cap-${p.id}">${esc(p.caption)}</div>` : ""}` : ""}
+      ${["listo", "publicando", "publicado", "error_publicar"].includes(p.estado) && p.video_id ? `
+        <div class="video"><iframe src="https://drive.google.com/file/d/${esc(p.video_id)}/preview" allow="autoplay; fullscreen" allowfullscreen></iframe></div>` : ""}
+      ${["listo", "error_publicar"].includes(p.estado) ? `
+        <textarea class="caption" id="cap-${p.id}" rows="6" placeholder="Texto de la publicación y hashtags…" onchange="guardarCaption('${p.id}', this)">${esc(p.caption)}</textarea>` : ""}
+      ${["publicando", "publicado"].includes(p.estado) && p.caption ? `<div class="guion">${esc(p.caption)}</div>` : ""}
+      ${p.estado === "publicado" && p.permalink ? `<p class="nota"><a href="${esc(p.permalink)}" target="_blank" rel="noopener">Ver en Instagram ↗</a></p>` : ""}
       ${["transcrito", "por_editar", "editando", "error_video"].includes(p.estado) && p.texto ? `<div class="guion">${esc(p.texto)}</div>` : ""}
       <div class="acciones">
         ${p.estado === "transcrito" ? `<button class="primario" onclick="estadoProyecto('${p.id}','por_editar')">Armar video</button>` : ""}
-        ${p.estado === "listo" ? `
+        ${["listo", "error_publicar"].includes(p.estado) ? `
+          <button class="primario" onclick="publicar('${p.id}')">${p.estado === "error_publicar" ? "Reintentar publicación" : "Publicar en Instagram"}</button>
           <a class="secundario" style="display:inline-flex;align-items:center;text-decoration:none" href="https://drive.google.com/uc?export=download&id=${esc(p.video_id)}" target="_blank" rel="noopener">Descargar</a>
-          ${p.caption ? `<button class="secundario" onclick="copiarTexto('cap-${p.id}')">Copiar texto</button>` : ""}
           <button class="sutil" onclick="estadoProyecto('${p.id}','por_editar')">Rehacer</button>` : ""}
         ${p.estado === "error_video" ? `<button class="secundario" onclick="estadoProyecto('${p.id}','por_editar')">Reintentar</button>` : ""}
         ${p.archivo_id && !EN_PROCESO.includes(p.estado) && p.estado !== "listo" ? `<button class="secundario" onclick="escuchar('${p.id}', this)">Escuchar</button>` : ""}
@@ -484,9 +491,18 @@ async function estadoProyecto(id, estado) {
   cargarProyectos();
 }
 
-function copiarTexto(idEl) {
-  navigator.clipboard.writeText(document.getElementById(idEl).innerText);
-  alert("Texto copiado. Pégalo en Instagram al publicar.");
+async function guardarCaption(id, el) {
+  try { await api("guardar_caption", { id, caption: el.value }); const p = proyectos.find(x => x.id === id); if (p) p.caption = el.value; }
+  catch (e) { alert(e.message); }
+}
+
+async function publicar(id) {
+  if (!IG_USUARIO) { alert("Instagram todavía no está conectado. Falta correr conectarInstagram en Apps Script."); return; }
+  const cap = document.getElementById("cap-" + id);
+  if (cap) await guardarCaption(id, cap);
+  if (!confirm(`¿Publicar este Reel en @${IG_USUARIO}? Se publica de inmediato.`)) return;
+  try { await api("publicar", { id }); } catch (e) { alert(e.message); }
+  cargarProyectos();
 }
 
 async function escuchar(id, btn) {
@@ -505,7 +521,7 @@ async function borrarProyecto(id) {
 }
 
 // ---------- arranque ----------
-if (CFG) cargar(); else mostrarConfig();
+if (CFG) { cargar(); api("ping").then(p => { IG_USUARIO = p.instagram || ""; }).catch(() => {}); } else mostrarConfig();
 </script>
 </body>
 </html>
