@@ -196,6 +196,7 @@ function doPost(e) {
         if (!permitidos.includes(b.estado)) return json_({ error: 'Estado inválido' });
         const cambios = { estado: b.estado, error: b.error || '' };
         if (!actualizar_('proyectos', b.id, cambios)) return json_({ error: 'Grabación no encontrada' });
+        if (b.estado === 'por_editar') avisarEditorNube_();
         return json_({ ok: true });
       }
       case 'subir_video':
@@ -404,6 +405,25 @@ function redactarCaption_(pr) {
   const texto = preguntarIA_(sistema, 'Título: ' + pr.titulo + '\nGuion/transcripción: ' + (pr.texto || pr.guion));
   const ini = texto.indexOf('{'), fin = texto.lastIndexOf('}');
   return String(JSON.parse(texto.slice(ini, fin + 1)).caption || '').trim();
+}
+
+// ============================================================
+// Editor en la nube (GitHub Actions)
+// ============================================================
+
+/** Dispara el workflow del repo privado para que arme el video de inmediato
+ *  (sin esto, el workflow revisa la cola cada 15 min). Requiere GITHUB_TOKEN y GITHUB_REPO
+ *  en Propiedades del script; si faltan, no pasa nada. */
+function avisarEditorNube_() {
+  const token = PROPS.getProperty('GITHUB_TOKEN'), repo = PROPS.getProperty('GITHUB_REPO');
+  if (!token || !repo) return;
+  try {
+    UrlFetchApp.fetch('https://api.github.com/repos/' + repo + '/dispatches', {
+      method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+      headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json' },
+      payload: JSON.stringify({ event_type: 'render' }),
+    });
+  } catch (_) { /* el cron de 15 min lo recoge de todos modos */ }
 }
 
 // ============================================================
