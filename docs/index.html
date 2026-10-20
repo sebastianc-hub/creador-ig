@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Creador IG">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1B2B40" media="(prefers-color-scheme: dark)">
+<title>Creador IG · MÖÖnna</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 76 60'%3E%3Cpath d='M 38 15.7 A 15 15 0 0 1 38 44.3 A 15 15 0 0 1 38 15.7 Z' fill='%23AFCFEE'/%3E%3Ccircle cx='28' cy='30' r='15' fill='none' stroke='%2347709F' stroke-width='2.6'/%3E%3Ccircle cx='48' cy='30' r='15' fill='none' stroke='%2347709F' stroke-width='2.6'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ===== Marca MÖÖnna · identidad v2 ===== */
+  :root {
+    --blue-100:#E6F0FB; --blue-200:#CDE2F6; --blue-300:#AFCFEE; --blue-400:#8CB4E0; --blue-700:#47709F; --blue-900:#2C4460;
+    --bg:#FFFFFF; --bg-suave:#F5FAFF; --ink:#2C4460; --texto:#47709F; --sutil:#8CB4E0; --line:#E6F0FB; --line-fuerte:#CDE2F6;
+    --primario:#2C4460; --primario-texto:#FFFFFF; --secundario:#47709F;
+    --rec:#E05A5A; --rec-suave:#F08A8A; --ok:#2E8B5A; --espera:#C98A1A; --error:#C84B4B;
+    --seg-bg:#E6F0FB; --seg-activo:#FFFFFF; --sombra:0 1px 3px rgba(44,68,96,.1);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#1B2B40; --bg-suave:#22364F; --ink:#F5FAFF; --texto:#AFCFEE; --sutil:#8CB4E0; --line:#2F4A68; --line-fuerte:#3A5C82;
+      --primario:#E6F0FB; --primario-texto:#2C4460; --secundario:#8CB4E0;
+      --rec:#E05A5A; --ok:#7FD1A6; --espera:#F0C36B; --error:#F08A8A;
+      --seg-bg:#2C4460; --seg-activo:#47709F; --sombra:none;
+    }
+  }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html { -webkit-text-size-adjust:100%; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 Manrope, system-ui, sans-serif; padding-bottom:env(safe-area-inset-bottom); }
+  a { color:var(--texto); } a:hover { color:var(--ink); }
+  header { padding:calc(14px + env(safe-area-inset-top)) 20px 0; max-width:720px; margin:auto; }
+  .marca { display:flex; align-items:center; gap:12px; }
+  .marca svg { flex-shrink:0; }
+  .marca .lockup { display:flex; flex-direction:column; }
+  .marca .nombre { font-weight:300; font-size:18px; color:var(--texto); line-height:1; }
+  .marca .app { font-size:9px; color:var(--sutil); letter-spacing:.4em; text-transform:uppercase; font-weight:500; margin-top:3px; white-space:nowrap; }
+  .marca .ajustes { margin-left:auto; border:0; background:none; color:var(--sutil); font-size:13px; min-height:44px; padding:0 4px; }
+  h1 { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); margin:0; }
+  nav { display:grid; grid-template-columns:1fr 1fr; background:var(--seg-bg); border-radius:12px; padding:3px; margin-top:18px; }
+  nav button { border:0; border-radius:10px; background:none; padding:11px 0; color:var(--texto); font:inherit; font-size:14px; min-height:44px; }
+  nav button.activo { background:var(--seg-activo); color:var(--ink); font-weight:600; box-shadow:var(--sombra); }
+  main { max-width:720px; margin:auto; padding:0 0 48px; }
+  section > .barra { padding:0 20px; }
+
+  /* Controles */
+  input, select, button { font:inherit; color:var(--ink); }
+  button { cursor:pointer; min-height:44px; }
+  button:disabled { opacity:.55; cursor:wait; }
+  .barra { display:flex; gap:10px; margin:20px 0 0; flex-wrap:wrap; align-items:center; }
+  .pedido { display:flex; flex-direction:column; align-items:stretch; gap:10px; margin:20px 20px 0; }
+  .campo { width:100%; display:flex; align-items:center; gap:10px; border-bottom:1.5px solid var(--line-fuerte); padding:10px 0; }
+  .campo input[type=text], .campo input[type=url] { flex:1; min-width:0; border:0; background:transparent; font-size:16px; padding:4px 0; outline:none; color:var(--ink); }
+  .campo input::placeholder { color:var(--sutil); }
+  .campo select { border:0; background:transparent; color:var(--texto); font-weight:600; font-size:15px; padding:4px 0; -webkit-appearance:none; appearance:none; }
+  button.primario { height:50px; padding:0 20px; border:0; border-radius:10px; background:var(--primario); color:var(--primario-texto); font-weight:600; font-size:16px; display:inline-flex; align-items:center; justify-content:center; gap:10px; }
+  .pedido button.primario { width:100%; }
+  button.secundario { height:46px; padding:0 16px; border:1.5px solid var(--line-fuerte); border-radius:10px; background:var(--bg); color:var(--ink); font-size:15px; }
+  button.sutil { height:46px; padding:0 14px; border:0; background:transparent; color:var(--texto); font-size:15px; }
+  .punto-rec { width:10px; height:10px; border-radius:50%; background:var(--rec-suave); display:inline-block; }
+  #aviso { color:var(--texto); font-size:13px; min-height:1.5em; padding:6px 20px 0; }
+
+  /* Filtros */
+  .filtros { display:flex; gap:18px; padding:14px 20px 0; border-bottom:1px solid var(--line); overflow-x:auto; scrollbar-width:none; }
+  .filtros::-webkit-scrollbar { display:none; }
+  .filtros button { border:0; border-radius:0; background:none; padding:0 0 10px; color:var(--texto); font-size:14px; white-space:nowrap; border-bottom:2px solid transparent; min-height:0; }
+  .filtros button.activo { color:var(--ink); font-weight:600; border-bottom-color:var(--primario); }
+
+  /* Tarjetas → filas con línea */
+  .tarjeta { padding:20px 20px 22px; border-bottom:1px solid var(--line); display:flex; flex-direction:column; gap:10px; }
+  .tarjeta h3 { margin:0; font-size:24px; font-weight:300; line-height:1.2; text-wrap:pretty; }
+  .meta { color:var(--texto); font-size:12px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .meta > * { white-space:nowrap; }
+  .meta > *:not(:last-child)::after { content:"·"; color:var(--line-fuerte); margin-left:10px; }
+  .meta .pilar { font-weight:600; }
+  .chip { border:0; padding:0; }
+  .gancho { margin:0; font-size:16px; font-weight:600; line-height:1.4; }
+  .guion { white-space:pre-wrap; margin:0; font-size:14px; line-height:1.55; color:var(--texto); padding-left:12px; border-left:2px solid var(--line-fuerte); }
+  .nota { color:var(--sutil); font-size:13px; margin:0; }
+  .nota b { color:var(--texto); font-weight:600; }
+  .acciones { display:flex; gap:8px; margin-top:6px; flex-wrap:wrap; align-items:center; }
+  .acciones .empuja { margin-left:auto; }
+  .usada { opacity:.6; } .descartada { opacity:.4; }
+  .vacio { color:var(--sutil); text-align:center; padding:48px 20px; font-size:15px; }
+  .estado-transcribiendo { color:var(--espera); font-weight:600; } .estado-transcrito { color:var(--ok); font-weight:600; } .estado-error { color:var(--error); font-weight:600; }
+  .meta .fecha { margin-left:auto; color:var(--sutil); }
+  .meta .fecha::before { content:none; }
+  audio { width:100%; height:40px; border-radius:10px; }
+  .oculto { display:none !important; }
+
+  /* Configuración inicial */
+  #config { padding:0 20px; }
+  #config h2 { font-weight:300; font-size:26px; margin:28px 0 6px; }
+  #config p { color:var(--texto); margin:0 0 6px; }
+  #config .pedido { margin:16px 0 0; }
+  #config .ayuda { font-size:13px; color:var(--sutil); margin-top:14px; line-height:1.6; }
+
+  /* ===== Ventana de grabación (hoja) ===== */
+  dialog { border:0; padding:0; margin:0; width:100vw; max-width:100vw; height:100dvh; max-height:100dvh; background:var(--blue-900); color:var(--ink); }
+  dialog::backdrop { background:rgba(44,68,96,.6); }
+  .dlg { position:absolute; left:0; right:0; bottom:0; top:calc(44px + env(safe-area-inset-top)); background:var(--bg); border-radius:28px 28px 0 0; display:flex; flex-direction:column; padding:14px 0 calc(20px + env(safe-area-inset-bottom)); max-width:720px; margin:auto; overflow:hidden; }
+  .dlg::before { content:""; width:40px; height:5px; border-radius:3px; background:var(--line-fuerte); margin:0 auto; flex-shrink:0; }
+  .dlg-cab { padding:18px 22px 0; display:flex; flex-direction:column; gap:4px; }
+  .dlg-cab .etiqueta { font-size:12px; color:var(--sutil); letter-spacing:.1em; text-transform:uppercase; font-weight:600; }
+  .dlg h2 { margin:0; font-size:22px; font-weight:400; line-height:1.2; }
+  #dlg-gancho { color:var(--texto); font-size:14px; margin:4px 0 0; }
+  .prompter { flex:1; min-height:120px; margin:16px 22px 0; background:var(--bg-suave); border-radius:16px; padding:18px 20px; font-size:clamp(22px, 6.5vw, 30px); line-height:1.45; overflow:auto; white-space:pre-wrap; }
+  .controles { display:flex; gap:16px; align-items:center; padding:18px 22px 0; }
+  .grabar { width:68px; height:68px; border-radius:50%; border:3px solid var(--line-fuerte); background:var(--rec); padding:0; flex-shrink:0; transition:border-radius .2s; }
+  .grabar.activo { border-radius:18px; animation:pulso 1.2s infinite; }
+  @keyframes pulso { 50% { box-shadow:0 0 0 12px rgba(224,90,90,.2); } }
+  .reloj { font-variant-numeric:tabular-nums; font-size:24px; font-weight:300; min-width:60px; }
+  .nivel { flex:1; min-width:80px; height:8px; background:var(--line); border-radius:99px; overflow:hidden; }
+  .nivel div { height:100%; width:0; background:var(--ok); transition:width .08s; }
+  #previa { margin:14px 22px 0; width:calc(100% - 44px); }
+  #dlg-aviso { margin:14px 22px 0; font-size:13px; color:var(--texto); }
+  .dlg .acciones { padding:18px 22px 0; margin-top:auto; flex-direction:column; align-items:stretch; gap:12px; }
+  .dlg .acciones #btn-usar { background:var(--blue-200); color:var(--blue-700); }
+  @media (prefers-color-scheme: dark) { .dlg .acciones #btn-usar { background:var(--blue-400); color:var(--blue-900); } }
+  .dlg .pie { display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:14px; color:var(--texto); }
+  .dlg .pie label { display:inline-flex; align-items:center; gap:6px; min-height:44px; cursor:pointer; }
+  .dlg .pie label u { font-weight:600; }
+  .dlg .pie input[type=file] { position:absolute; width:1px; height:1px; opacity:0; }
+  #btn-cerrar { font-weight:600; }
+
+  @media (min-width: 720px) {
+    dialog { width:min(720px, 100vw); max-width:720px; height:auto; max-height:90dvh; border-radius:24px; margin:auto; background:var(--bg); }
+    .dlg { position:static; border-radius:24px; padding-top:16px; max-height:90dvh; }
+    .prompter { max-height:45vh; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="marca">
+    <svg width="30" height="24" viewBox="0 0 76 60" aria-hidden="true">
+      <path d="M 38 15.7 A 15 15 0 0 1 38 44.3 A 15 15 0 0 1 38 15.7 Z" fill="#AFCFEE"></path>
+      <circle cx="28" cy="30" r="15" fill="none" stroke="#47709F" stroke-width="2.6"></circle>
+      <circle cx="48" cy="30" r="15" fill="none" stroke="#47709F" stroke-width="2.6"></circle>
+    </svg>
+    <div class="lockup"><span class="nombre">MÖÖnna</span><span class="app">Creador IG</span></div>
+    <button class="ajustes" onclick="mostrarConfig()" aria-label="Ajustes">Ajustes</button>
+  </div>
+  <h1>Creador IG · MÖÖnna</h1>
+  <nav id="nav">
+    <button data-tab="ideas" class="activo">Ideas</button>
+    <button data-tab="grabaciones">Grabaciones</button>
+  </nav>
+</header>
+<main>
+  <!-- ===== Configuración (solo la primera vez) ===== -->
+  <section id="config" class="oculto">
+    <h2>Conectar con tu backend</h2>
+    <p>Pega la dirección de tu Apps Script y el código que te dio al instalar.</p>
+    <div class="pedido">
+      <div class="campo"><input type="url" id="cfg-url" placeholder="https://script.google.com/macros/s/…/exec" autocapitalize="off" autocorrect="off"></div>
+      <div class="campo"><input type="text" id="cfg-token" placeholder="Código" autocapitalize="off" autocorrect="off"></div>
+      <button class="primario" id="cfg-guardar">Conectar</button>
+      <p class="nota" id="cfg-aviso"></p>
+    </div>
+    <p class="ayuda">Se guarda solo en este teléfono. Lo encuentras en el editor de Apps Script: Implementar → Administrar implementaciones (la URL) y en el registro de la función <b>instalar</b> (el código).</p>
+  </section>
+
+  <!-- ===== Ideas ===== -->
+  <section id="tab-ideas">
+    <div class="pedido barra">
+      <div class="campo">
+        <input type="text" id="tema" placeholder="Tema opcional: IA en restaurantes, una anécdota, tendencia…">
+        <select id="cantidad" aria-label="Cantidad de ideas"><option value="3">3 ideas</option><option value="5" selected>5 ideas</option><option value="8">8 ideas</option></select>
+      </div>
+      <button id="generar" class="primario">Dame ideas</button>
+    </div>
+    <div id="aviso"></div>
+    <div class="filtros">
+      <button data-f="pendiente" class="activo">Pendientes</button>
+      <button data-f="usada">Usadas</button>
+      <button data-f="descartada">Descartadas</button>
+      <button data-f="todas">Todas</button>
+    </div>
+    <div id="lista"></div>
+  </section>
+
+  <!-- ===== Grabaciones ===== -->
+  <section id="tab-grabaciones" class="oculto">
+    <div class="barra">
+      <button class="primario" onclick="abrirGrabadora(null)"><span class="punto-rec"></span>Grabación libre</button>
+      <span class="nota">o graba desde una idea con “Grabar”.</span>
+    </div>
+    <div id="grabaciones" style="margin-top:22px; border-top:1px solid var(--line);"></div>
+  </section>
+</main>
+
+<dialog id="dlg">
+  <div class="dlg">
+    <div class="dlg-cab">
+      <span class="etiqueta">Grabar</span>
+      <h2 id="dlg-titulo">Grabar</h2>
+      <p class="nota" id="dlg-gancho"></p>
+    </div>
+    <div class="prompter" id="dlg-guion"></div>
+    <div class="controles">
+      <button class="grabar" id="btn-grabar" title="Grabar / detener" aria-label="Grabar o detener"></button>
+      <span class="reloj" id="reloj">0:00</span>
+      <div class="nivel"><div id="nivel"></div></div>
+    </div>
+    <audio id="previa" controls class="oculto"></audio>
+    <p class="nota" id="dlg-aviso"></p>
+    <div class="acciones">
+      <button class="primario oculto" id="btn-usar">Usar esta toma</button>
+      <div class="pie">
+        <label>¿Ya lo grabaste en Notas de Voz? <u>Subir archivo</u>
+          <input type="file" id="archivo" accept="audio/*,video/*">
+        </label>
+        <button id="btn-cerrar" class="sutil">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</dialog>
+
+<script>
+const ESTILOS = { stock:"Clips de stock", ia:"Imágenes IA", texto:"Texto animado", propio:"Tu material" };
+const ESTADOS = { transcribiendo:"Transcribiendo…", transcrito:"Transcrito", error:"Error" };
+let ideas = [], proyectos = [], filtro = "pendiente", sondeo = null;
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const mmss = s => `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,"0")}`;
+
+// ---------- conexión con el backend (Apps Script) ----------
+let CFG = null;
+try { CFG = JSON.parse(localStorage.getItem("cfg") || "null"); } catch {}
+
+async function api(accion, cuerpo, params = {}) {
+  if (!CFG) throw new Error("Falta conectar el backend (Ajustes).");
+  const url = new URL(CFG.url);
+  url.searchParams.set("token", CFG.token);
+  url.searchParams.set("accion", accion);
+  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+  // POST como text/plain: Apps Script no contesta preflights CORS.
+  const r = cuerpo
+    ? await fetch(url, { method:"POST", headers:{ "Content-Type":"text/plain;charset=utf-8" }, body: JSON.stringify({ accion, ...cuerpo }) })
+    : await fetch(url);
+  let d;
+  try { d = await r.json(); } catch { throw new Error("El backend no respondió JSON. Revisa la URL."); }
+  if (d && d.error) throw new Error(d.error);
+  return d;
+}
+
+function mostrarConfig() {
+  $("#config").classList.remove("oculto");
+  $("#tab-ideas").classList.add("oculto"); $("#tab-grabaciones").classList.add("oculto"); $("#nav").classList.add("oculto");
+  if (CFG) { $("#cfg-url").value = CFG.url; $("#cfg-token").value = CFG.token; }
+}
+
+$("#cfg-guardar").onclick = async () => {
+  const url = $("#cfg-url").value.trim(), token = $("#cfg-token").value.trim();
+  if (!/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/.test(url)) { $("#cfg-aviso").textContent = "La URL debe terminar en /exec."; return; }
+  const prev = CFG; CFG = { url, token };
+  $("#cfg-guardar").disabled = true; $("#cfg-aviso").textContent = "Probando…";
+  try {
+    const p = await api("ping");
+    localStorage.setItem("cfg", JSON.stringify(CFG));
+    $("#cfg-aviso").textContent = p.gemini ? "" : "Conectado, pero falta GEMINI_API_KEY en el script.";
+    $("#config").classList.add("oculto"); $("#nav").classList.remove("oculto"); verTab("ideas"); cargar();
+  } catch (e) { CFG = prev; $("#cfg-aviso").textContent = e.message; }
+  $("#cfg-guardar").disabled = false;
+};
+
+// ---------- pestañas ----------
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => verTab(b.dataset.tab));
+function verTab(t) {
+  document.querySelectorAll("nav button").forEach(x => x.classList.toggle("activo", x.dataset.tab === t));
+  $("#tab-ideas").classList.toggle("oculto", t !== "ideas");
+  $("#tab-grabaciones").classList.toggle("oculto", t !== "grabaciones");
+  if (t === "grabaciones") cargarProyectos();
+}
+
+// ---------- ideas ----------
+async function cargar() {
+  try { ideas = await api("ideas"); } catch (e) { $("#aviso").textContent = e.message; return; }
+  pintar();
+}
+
+function pintar() {
+  const vis = ideas.filter(i => filtro === "todas" || i.estado === filtro);
+  $("#lista").innerHTML = vis.length ? vis.map(i => `
+    <article class="tarjeta ${i.estado}">
+      <div class="meta">
+        <span class="chip pilar">${esc(i.pilar)}</span>
+        <span class="chip">${esc(ESTILOS[i.estilo] || i.estilo)}</span>
+        <span>${esc(i.duracion_seg)} s</span>
+      </div>
+      <h3>${esc(i.titulo)}</h3>
+      <p class="gancho">${esc(i.gancho)}</p>
+      <div class="guion">${esc(i.guion)}</div>
+      <p class="nota"><b>Visuales</b> · ${esc(i.visuales)}</p>
+      <p class="nota"><b>Por qué funciona</b> · ${esc(i.por_que_funciona)}</p>
+      <div class="acciones">
+        <button class="primario" onclick="abrirGrabadora('${i.id}')"><span class="punto-rec"></span>Grabar</button>
+        <button class="secundario" onclick="copiar('${i.id}')">Copiar guion</button>
+        ${i.estado !== "descartada" ? `<button class="sutil empuja" onclick="estado('${i.id}','descartada')">Descartar</button>` : ""}
+        ${i.estado !== "pendiente" ? `<button class="sutil empuja" onclick="estado('${i.id}','pendiente')">Volver a pendientes</button>` : ""}
+      </div>
+    </article>`).join("") : `<p class="vacio">No hay ideas aquí. Dale a “Dame ideas”.</p>`;
+}
+
+async function estado(id, nuevo) {
+  try { await api("estado_idea", { id, estado: nuevo }); } catch (e) { $("#aviso").textContent = e.message; }
+  cargar();
+}
+
+function copiar(id) {
+  navigator.clipboard.writeText(ideas.find(x => x.id === id).guion);
+  $("#aviso").textContent = "Guion copiado.";
+}
+
+$("#generar").onclick = async () => {
+  const b = $("#generar");
+  b.disabled = true; b.textContent = "Pensando…"; $("#aviso").textContent = "";
+  try {
+    await api("generar_ideas", { tema: $("#tema").value, cantidad: +$("#cantidad").value });
+    filtro = "pendiente"; document.querySelectorAll(".filtros button").forEach(x => x.classList.toggle("activo", x.dataset.f === filtro));
+    await cargar();
+  } catch (e) { $("#aviso").textContent = e.message; }
+  b.disabled = false; b.textContent = "Dame ideas";
+};
+
+document.querySelectorAll(".filtros button").forEach(btn => btn.onclick = () => {
+  filtro = btn.dataset.f;
+  document.querySelectorAll(".filtros button").forEach(x => x.classList.toggle("activo", x === btn));
+  pintar();
+});
+
+// ---------- grabadora (WAV 16 kHz mono: funciona igual en iPhone, Android y PC) ----------
+let ideaActual = null, grabando = false, toma = null, inicio = 0, tic = null;
+let flujo = null, ctxGrab = null, fuente = null, proc = null, buffers = [];
+
+function abrirGrabadora(ideaId) {
+  ideaActual = ideas.find(i => i.id === ideaId) || null;
+  $("#dlg-titulo").textContent = ideaActual ? ideaActual.titulo : "Grabación libre";
+  $("#dlg-gancho").textContent = ideaActual ? `Gancho: “${ideaActual.gancho}”` : "Habla de lo que quieras; la app lo transcribe.";
+  $("#dlg-guion").textContent = ideaActual ? ideaActual.guion : "(Sin guion)";
+  $("#dlg-guion").classList.toggle("oculto", !ideaActual);
+  reiniciarToma();
+  $("#dlg").showModal();
+}
+
+function reiniciarToma() {
+  toma = null; $("#previa").classList.add("oculto"); $("#btn-usar").classList.add("oculto");
+  $("#reloj").textContent = "0:00"; $("#dlg-aviso").textContent = "Dale al botón rojo para empezar. Lee con calma: los silencios se recortan después.";
+  $("#archivo").value = "";
+}
+
+$("#btn-grabar").onclick = async () => {
+  if (grabando) { detener(); return; }
+  try {
+    flujo = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:false, noiseSuppression:true, autoGainControl:true } });
+  } catch { $("#dlg-aviso").textContent = "No pude usar el micrófono. Revisa el permiso del navegador."; return; }
+  reiniciarToma();
+  ctxGrab = new (window.AudioContext || window.webkitAudioContext)();
+  await ctxGrab.resume(); // iPhone lo exige dentro del toque
+  fuente = ctxGrab.createMediaStreamSource(flujo);
+  proc = ctxGrab.createScriptProcessor(4096, 1, 1);
+  buffers = [];
+  proc.onaudioprocess = e => {
+    const d = e.inputBuffer.getChannelData(0);
+    buffers.push(new Float32Array(d));
+    let m = 0; for (let i = 0; i < d.length; i += 8) m = Math.max(m, Math.abs(d[i]));
+    $("#nivel").style.width = Math.min(100, m * 160) + "%";
+  };
+  fuente.connect(proc); proc.connect(ctxGrab.destination); // la salida va en silencio: no hay eco
+  grabando = true; inicio = Date.now();
+  $("#btn-grabar").classList.add("activo");
+  $("#dlg-aviso").textContent = "Grabando… vuelve a picar el botón para terminar.";
+  tic = setInterval(() => $("#reloj").textContent = mmss((Date.now() - inicio) / 1000), 250);
+};
+
+function detener() {
+  grabando = false; clearInterval(tic);
+  try { proc.disconnect(); fuente.disconnect(); } catch {}
+  flujo.getTracks().forEach(t => t.stop());
+  const tasa = ctxGrab.sampleRate; ctxGrab.close();
+  $("#btn-grabar").classList.remove("activo"); $("#nivel").style.width = 0;
+  toma = codificarWav(buffers, tasa, 16000); buffers = [];
+  $("#previa").src = URL.createObjectURL(toma); $("#previa").classList.remove("oculto");
+  $("#btn-usar").classList.remove("oculto");
+  $("#dlg-aviso").textContent = "Escúchala. Si te late, “Usar esta toma”; si no, vuelve a grabar.";
+}
+
+function codificarWav(bufs, tasaOrig, tasaDest) {
+  let n = 0; for (const b of bufs) n += b.length;
+  const todo = new Float32Array(n); let o = 0; for (const b of bufs) { todo.set(b, o); o += b.length; }
+  const factor = tasaOrig / tasaDest, m = Math.floor(todo.length / factor), out = new Int16Array(m);
+  for (let i = 0; i < m; i++) {
+    const pos = i * factor, j = Math.floor(pos), f = pos - j;
+    const s = todo[j] * (1 - f) + (todo[j + 1] ?? todo[j]) * f;
+    out[i] = Math.max(-1, Math.min(1, s)) * 32767;
+  }
+  const buf = new ArrayBuffer(44 + out.length * 2), v = new DataView(buf);
+  const w = (p, s) => { for (let i = 0; i < s.length; i++) v.setUint8(p + i, s.charCodeAt(i)); };
+  w(0, "RIFF"); v.setUint32(4, 36 + out.length * 2, true); w(8, "WAVE");
+  w(12, "fmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, tasaDest, true); v.setUint32(28, tasaDest * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  w(36, "data"); v.setUint32(40, out.length * 2, true);
+  new Int16Array(buf, 44).set(out);
+  return new Blob([buf], { type:"audio/wav" });
+}
+
+$("#btn-usar").onclick = () => subir(toma, "grabacion.wav");
+$("#archivo").onchange = e => e.target.files[0] && subir(e.target.files[0], e.target.files[0].name);
+
+function aBase64(blob) {
+  return new Promise((ok, mal) => { const fr = new FileReader(); fr.onload = () => ok(fr.result.split(",")[1]); fr.onerror = mal; fr.readAsDataURL(blob); });
+}
+
+async function subir(blob, nombre) {
+  if (blob.size > 24 * 1024 * 1024) { $("#dlg-aviso").textContent = "El archivo pasa de 24 MB. Recórtalo o graba de nuevo."; return; }
+  $("#btn-usar").disabled = true; $("#dlg-aviso").textContent = "Subiendo…";
+  try {
+    const ext = (nombre.split(".").pop() || "").toLowerCase();
+    const mime = blob.type || ({ m4a:"audio/mp4", mp3:"audio/mp3", wav:"audio/wav", mp4:"video/mp4", ogg:"audio/ogg", aac:"audio/aac" }[ext] || "audio/mp4");
+    await api("subir_audio", { idea_id: ideaActual ? ideaActual.id : "", nombre, mime, base64: await aBase64(blob) });
+    $("#dlg").close(); await cargar(); verTab("grabaciones");
+  } catch (e) { $("#dlg-aviso").textContent = e.message; }
+  $("#btn-usar").disabled = false;
+}
+
+$("#btn-cerrar").onclick = () => { if (grabando) detener(); $("#dlg").close(); };
+
+// ---------- grabaciones ----------
+async function cargarProyectos() {
+  try { proyectos = await api("proyectos"); } catch (e) { $("#grabaciones").innerHTML = `<p class="vacio">${esc(e.message)}</p>`; return; }
+  $("#grabaciones").innerHTML = proyectos.length ? proyectos.map(p => `
+    <article class="tarjeta" id="p-${p.id}">
+      <div class="meta">
+        <span class="estado-${p.estado}">${ESTADOS[p.estado] || p.estado}</span>
+        ${p.duracion ? `<span>${mmss(+p.duracion)}</span>` : ""}
+        ${p.estilo ? `<span class="chip">${esc(ESTILOS[p.estilo] || p.estilo)}</span>` : ""}
+        <span class="fecha">${esc(String(p.creado).replace("T", " ").slice(0, 16))}</span>
+      </div>
+      <h3 style="font-size:20px; font-weight:400">${esc(p.titulo)}</h3>
+      ${p.estado === "transcribiendo" ? `<p class="nota">Suele tardar menos de un minuto.</p>` : ""}
+      ${p.estado === "error" ? `<p class="nota estado-error">${esc(p.error)}</p>` : ""}
+      ${p.estado === "transcrito" ? `<div class="guion">${esc(p.texto)}</div>` : ""}
+      <div class="acciones">
+        ${p.archivo_id && p.estado !== "transcribiendo" ? `<button class="secundario" onclick="escuchar('${p.id}', this)">Escuchar</button>` : ""}
+        ${p.estado !== "transcribiendo" ? `<button class="sutil empuja" onclick="borrarProyecto('${p.id}')">Borrar</button>` : ""}
+      </div>
+    </article>`).join("") : `<p class="vacio">Aún no hay grabaciones.</p>`;
+
+  clearTimeout(sondeo);
+  if (proyectos.some(p => p.estado === "transcribiendo")) sondeo = setTimeout(cargarProyectos, 5000);
+}
+
+async function escuchar(id, btn) {
+  btn.disabled = true; btn.textContent = "Cargando…";
+  try {
+    const a = await api("audio", null, { id });
+    const el = document.createElement("audio"); el.controls = true; el.src = `data:${a.mime};base64,${a.base64}`;
+    btn.replaceWith(el); el.play().catch(() => {});
+  } catch (e) { btn.textContent = e.message; }
+}
+
+async function borrarProyecto(id) {
+  if (!confirm("¿Borrar esta grabación? No se puede deshacer.")) return;
+  try { await api("borrar_proyecto", { id }); } catch (e) { alert(e.message); }
+  cargarProyectos();
+}
+
+// ---------- arranque ----------
+if (CFG) cargar(); else mostrarConfig();
+</script>
+</body>
+</html>
