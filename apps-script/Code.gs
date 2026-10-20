@@ -237,10 +237,38 @@ function json_(obj) {
 // Ideas
 // ============================================================
 
+// Fechas (mes-día) que vale la pena aprovechar con contenido o promociones.
+const FESTIVIDADES = [
+  ['01-06', 'Día de Reyes'], ['02-14', 'San Valentín'], ['03-08', 'Día de la Mujer'],
+  ['04-30', 'Día del Niño'], ['05-10', 'Día de las Madres (México)'], ['05-15', 'Día del Maestro'],
+  ['06-15', 'Día del Padre (tercer domingo de junio)'], ['09-15', 'Fiestas Patrias / Grito'],
+  ['10-31', 'Halloween'], ['11-02', 'Día de Muertos'], ['11-14', 'El Buen Fin'],
+  ['11-28', 'Black Friday / Cyber Monday'], ['12-12', 'Posadas y cierre de año'], ['12-24', 'Navidad'],
+  ['12-31', 'Año Nuevo'],
+];
+
+function festividadesProximas_(dias) {
+  const hoy = new Date();
+  const out = [];
+  for (const [md, nombre] of FESTIVIDADES) {
+    for (const anio of [hoy.getFullYear(), hoy.getFullYear() + 1]) {
+      const f = new Date(anio, Number(md.slice(0, 2)) - 1, Number(md.slice(3)));
+      const faltan = Math.round((f - hoy) / 86400000);
+      if (faltan >= -1 && faltan <= dias) out.push(nombre + ' (en ' + Math.max(0, faltan) + ' días)');
+    }
+  }
+  return out;
+}
+
 function generarIdeas_(tema, cantidad) {
   const previas = tabla_('ideas').slice(-40).map(i => i.titulo); // las últimas 40 = las más recientes
-  let instruccion = 'Dame ' + cantidad + ' ideas nuevas.';
+  let instruccion = 'Hoy es ' + Utilities.formatDate(new Date(), TZ, 'EEEE d MMMM yyyy') + '. Dame ' + cantidad + ' ideas nuevas.';
   if (tema.trim()) instruccion += ' Enfócate en: ' + tema.trim() + '.';
+  const fiestas = festividadesProximas_(21);
+  if (fiestas.length && cantidad >= 3) {
+    instruccion += '\nSe acercan: ' + fiestas.join(', ') + '. Incluye al menos 1 idea que las aproveche ' +
+      '(contenido con ese tema o un promocional de MÖÖnna ligado a la fecha), sin forzar el chiste.';
+  }
   if (previas.length) instruccion += '\nYa usadas o propuestas (no repetir):\n- ' + previas.join('\n- ');
 
   const texto = preguntarIA_(SISTEMA + marca_(), instruccion);
