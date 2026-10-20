@@ -162,7 +162,7 @@
       <button class="primario" id="cfg-guardar">Conectar</button>
       <p class="nota" id="cfg-aviso"></p>
     </div>
-    <p class="ayuda">Se guarda solo en este teléfono. Lo encuentras en el editor de Apps Script: Implementar → Administrar implementaciones (la URL) y en el registro de la función <b>instalar</b> (el código).</p>
+    <p class="ayuda">Se guarda solo en este teléfono. Conecta primero y <b>después</b> agrégala a la pantalla de inicio. Lo encuentras en el editor de Apps Script: Implementar → Administrar implementaciones (la URL) y en el registro de la función <b>instalar</b> (el código).</p>
   </section>
 
   <!-- ===== Ideas ===== -->
@@ -230,8 +230,16 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const mmss = s => `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,"0")}`;
 
 // ---------- conexión con el backend (Apps Script) ----------
+// En iPhone, la app de pantalla de inicio no comparte almacenamiento con Safari,
+// así que la configuración también viaja en el #hash de la URL (nunca llega al servidor).
 let CFG = null;
 try { CFG = JSON.parse(localStorage.getItem("cfg") || "null"); } catch {}
+try {
+  const m = location.hash.match(/^#c=(.+)$/);
+  if (m) { const c = JSON.parse(atob(m[1])); if (c.url && c.token) { CFG = c; localStorage.setItem("cfg", JSON.stringify(c)); } }
+} catch {}
+function fijarHash() { if (CFG) history.replaceState(null, "", "#c=" + btoa(JSON.stringify(CFG))); }
+fijarHash();
 
 async function api(accion, cuerpo, params = {}) {
   if (!CFG) throw new Error("Falta conectar el backend (Ajustes).");
@@ -262,8 +270,8 @@ $("#cfg-guardar").onclick = async () => {
   $("#cfg-guardar").disabled = true; $("#cfg-aviso").textContent = "Probando…";
   try {
     const p = await api("ping");
-    localStorage.setItem("cfg", JSON.stringify(CFG));
-    $("#cfg-aviso").textContent = p.gemini ? "" : "Conectado, pero falta GEMINI_API_KEY en el script.";
+    localStorage.setItem("cfg", JSON.stringify(CFG)); fijarHash();
+    $("#aviso").textContent = p.gemini ? `Conectado · clave Gemini ${p.clave}` : "Conectado, pero falta GEMINI_API_KEY en el script.";
     $("#config").classList.add("oculto"); $("#nav").classList.remove("oculto"); verTab("ideas"); cargar();
   } catch (e) { CFG = prev; $("#cfg-aviso").textContent = e.message; }
   $("#cfg-guardar").disabled = false;

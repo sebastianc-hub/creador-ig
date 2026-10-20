@@ -141,8 +141,10 @@ function doGet(e) {
   if (!autorizado_(p.token)) return json_({ error: 'Código incorrecto' });
   try {
     switch (p.accion) {
-      case 'ping':
-        return json_({ ok: true, gemini: !!PROPS.getProperty('GEMINI_API_KEY') });
+      case 'ping': {
+        const k = claveGemini_();
+        return json_({ ok: true, gemini: !!k, clave: k ? k.slice(0, 4) + '…' + k.slice(-3) + ' (' + k.length + ')' : '' });
+      }
       case 'ideas':
         return json_(tabla_('ideas').reverse()); // las más nuevas primero
       case 'proyectos':
@@ -326,8 +328,15 @@ function duracionWav_(bytes) {
 // ============================================================
 
 /** preguntarIA_(sistema, mensaje) para texto, o preguntarIA_(null, null, partes) para multimodal. */
+/** Lee la clave tolerando que se haya pegado con "GEMINI_API_KEY=", comillas o espacios. */
+function claveGemini_() {
+  let k = String(PROPS.getProperty('GEMINI_API_KEY') || '').trim();
+  k = k.replace(/^GEMINI_API_KEY\s*=\s*/i, '').replace(/^["']|["']$/g, '').trim();
+  return k;
+}
+
 function preguntarIA_(sistema, mensaje, partes) {
-  const clave = PROPS.getProperty('GEMINI_API_KEY');
+  const clave = claveGemini_();
   if (!clave) throw new Error('Falta GEMINI_API_KEY en Propiedades del script');
 
   const cuerpo = {
