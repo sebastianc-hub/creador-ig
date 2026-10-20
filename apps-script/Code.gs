@@ -332,7 +332,8 @@ function duracionWav_(bytes) {
 function claveGemini_() {
   let k = String(PROPS.getProperty('GEMINI_API_KEY') || '').trim();
   k = k.replace(/^GEMINI_API_KEY\s*=\s*/i, '').replace(/^["']|["']$/g, '').trim();
-  return k;
+  return k.split(/\s+/)[0]; // si se pegaron más líneas (p. ej. MODELO_GEMINI=...), solo la clave
+
 }
 
 function preguntarIA_(sistema, mensaje, partes) {
