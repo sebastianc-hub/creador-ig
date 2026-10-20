@@ -90,6 +90,9 @@
   .meta .fecha { margin-left:auto; color:var(--sutil); }
   .meta .fecha::before { content:none; }
   audio { width:100%; height:40px; border-radius:10px; }
+  .video { position:relative; width:min(100%, 300px); aspect-ratio:9/16; border-radius:14px; overflow:hidden; background:var(--blue-900); margin:4px auto 0; }
+  .video iframe { position:absolute; inset:0; width:100%; height:100%; border:0; }
+  .estado-por_editar, .estado-editando { color:var(--espera); font-weight:600; } .estado-listo, .estado-publicado { color:var(--ok); font-weight:600; } .estado-error_video { color:var(--error); font-weight:600; }
   .oculto { display:none !important; }
 
   /* Configuración inicial */
@@ -223,7 +226,9 @@
 
 <script>
 const ESTILOS = { stock:"Clips de stock", ia:"Imágenes IA", texto:"Texto animado", propio:"Tu material" };
-const ESTADOS = { transcribiendo:"Transcribiendo…", transcrito:"Transcrito", error:"Error" };
+const ESTADOS = { transcribiendo:"Transcribiendo…", transcrito:"Transcrito", error:"Error",
+  por_editar:"En cola para la PC", editando:"Armando video…", listo:"Video listo", error_video:"Falló el video", publicado:"Publicado" };
+const EN_PROCESO = ["transcribiendo", "por_editar", "editando"];
 let ideas = [], proyectos = [], filtro = "pendiente", sondeo = null;
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -451,16 +456,37 @@ async function cargarProyectos() {
       </div>
       <h3 style="font-size:20px; font-weight:400">${esc(p.titulo)}</h3>
       ${p.estado === "transcribiendo" ? `<p class="nota">Suele tardar menos de un minuto.</p>` : ""}
-      ${p.estado === "error" ? `<p class="nota estado-error">${esc(p.error)}</p>` : ""}
-      ${p.estado === "transcrito" ? `<div class="guion">${esc(p.texto)}</div>` : ""}
+      ${p.estado === "por_editar" ? `<p class="nota">Se arma en cuanto la PC esté encendida con el Editor abierto.</p>` : ""}
+      ${p.estado === "editando" ? `<p class="nota">La PC está trabajando. Tarda unos minutos.</p>` : ""}
+      ${["error", "error_video"].includes(p.estado) ? `<p class="nota estado-error">${esc(p.error)}</p>` : ""}
+      ${p.estado === "listo" && p.video_id ? `
+        <div class="video"><iframe src="https://drive.google.com/file/d/${esc(p.video_id)}/preview" allow="autoplay; fullscreen" allowfullscreen></iframe></div>
+        ${p.caption ? `<div class="guion" id="cap-${p.id}">${esc(p.caption)}</div>` : ""}` : ""}
+      ${["transcrito", "por_editar", "editando", "error_video"].includes(p.estado) && p.texto ? `<div class="guion">${esc(p.texto)}</div>` : ""}
       <div class="acciones">
-        ${p.archivo_id && p.estado !== "transcribiendo" ? `<button class="secundario" onclick="escuchar('${p.id}', this)">Escuchar</button>` : ""}
-        ${p.estado !== "transcribiendo" ? `<button class="sutil empuja" onclick="borrarProyecto('${p.id}')">Borrar</button>` : ""}
+        ${p.estado === "transcrito" ? `<button class="primario" onclick="estadoProyecto('${p.id}','por_editar')">Armar video</button>` : ""}
+        ${p.estado === "listo" ? `
+          <a class="secundario" style="display:inline-flex;align-items:center;text-decoration:none" href="https://drive.google.com/uc?export=download&id=${esc(p.video_id)}" target="_blank" rel="noopener">Descargar</a>
+          ${p.caption ? `<button class="secundario" onclick="copiarTexto('cap-${p.id}')">Copiar texto</button>` : ""}
+          <button class="sutil" onclick="estadoProyecto('${p.id}','por_editar')">Rehacer</button>` : ""}
+        ${p.estado === "error_video" ? `<button class="secundario" onclick="estadoProyecto('${p.id}','por_editar')">Reintentar</button>` : ""}
+        ${p.archivo_id && !EN_PROCESO.includes(p.estado) && p.estado !== "listo" ? `<button class="secundario" onclick="escuchar('${p.id}', this)">Escuchar</button>` : ""}
+        ${!EN_PROCESO.includes(p.estado) ? `<button class="sutil empuja" onclick="borrarProyecto('${p.id}')">Borrar</button>` : ""}
       </div>
     </article>`).join("") : `<p class="vacio">Aún no hay grabaciones.</p>`;
 
   clearTimeout(sondeo);
-  if (proyectos.some(p => p.estado === "transcribiendo")) sondeo = setTimeout(cargarProyectos, 5000);
+  if (proyectos.some(p => EN_PROCESO.includes(p.estado))) sondeo = setTimeout(cargarProyectos, 8000);
+}
+
+async function estadoProyecto(id, estado) {
+  try { await api("estado_proyecto", { id, estado }); } catch (e) { alert(e.message); }
+  cargarProyectos();
+}
+
+function copiarTexto(idEl) {
+  navigator.clipboard.writeText(document.getElementById(idEl).innerText);
+  alert("Texto copiado. Pégalo en Instagram al publicar.");
 }
 
 async function escuchar(id, btn) {

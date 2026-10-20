@@ -20,8 +20,13 @@ const MODELOS = ['gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-flas
 
 const COLUMNAS = {
   ideas: ['id', 'creada', 'estado', 'titulo', 'pilar', 'gancho', 'guion', 'duracion_seg', 'estilo', 'visuales', 'por_que_funciona'],
-  proyectos: ['id', 'creado', 'estado', 'idea_id', 'titulo', 'estilo', 'guion', 'archivo_id', 'mime', 'nombre_archivo', 'duracion', 'texto', 'error'],
+  proyectos: ['id', 'creado', 'estado', 'idea_id', 'titulo', 'estilo', 'guion', 'archivo_id', 'mime', 'nombre_archivo', 'duracion', 'texto', 'error',
+              'video_id', 'caption', 'visuales', 'gancho'],
 };
+
+// Estados de un proyecto:
+//   transcribiendo → transcrito → por_editar → editando → listo (→ publicado, paso 4)
+//   y "error" / "error_video" cuando algo falla.
 
 const SISTEMA = `Eres el estratega de contenido de Instagram de la marca descrita abajo.
 Propones ideas para Reels de 20 a 45 segundos que el dueño grabará SOLO CON SU VOZ
@@ -124,6 +129,7 @@ function instalar() {
   if (!PROPS.getProperty('TOKEN')) {
     PROPS.setProperty('TOKEN', Utilities.getUuid().replace(/-/g, '').slice(0, 20));
   }
+  asegurarColumnas_();
 
   Logger.log('Listo.\n' +
     'Hoja: https://docs.google.com/spreadsheets/d/' + sheetId + '\n' +
@@ -155,6 +161,8 @@ function doGet(e) {
         const f = DriveApp.getFileById(pr.archivo_id);
         return json_({ mime: f.getMimeType(), base64: Utilities.base64Encode(f.getBlob().getBytes()) });
       }
+      case 'cola_render': // lo consulta la PC
+        return json_({ pendientes: tabla_('proyectos').filter(x => x.estado === 'por_editar'), marca: marca_() });
       default:
         return json_({ error: 'Acción desconocida: ' + p.accion });
     }
@@ -179,11 +187,22 @@ function doPost(e) {
       }
       case 'subir_audio':
         return json_(subirAudio_(b));
+      case 'estado_proyecto': { // teléfono: "Armar video" / "Rehacer"; PC: editando / error_video
+        const permitidos = ['por_editar', 'editando', 'error_video', 'transcrito'];
+        if (!permitidos.includes(b.estado)) return json_({ error: 'Estado inválido' });
+        const cambios = { estado: b.estado, error: b.error || '' };
+        if (!actualizar_('proyectos', b.id, cambios)) return json_({ error: 'Grabación no encontrada' });
+        return json_({ ok: true });
+      }
+      case 'subir_video':
+        return json_(subirVideo_(b));
       case 'borrar_proyecto': {
         const pr = fila_('proyectos', b.id);
         if (!pr) return json_({ error: 'Grabación no encontrada' });
         if (pr.estado === 'transcribiendo') return json_({ error: 'Espera a que termine de transcribir' });
-        if (pr.archivo_id) { try { DriveApp.getFileById(pr.archivo_id).setTrashed(true); } catch (_) {} }
+        for (const fid of [pr.archivo_id, pr.video_id]) {
+          if (fid) { try { DriveApp.getFileById(fid).setTrashed(true); } catch (_) {} }
+        }
         borrar_('proyectos', b.id);
         return json_({ ok: true });
       }
@@ -239,6 +258,7 @@ function marca_() {
 
 function subirAudio_(b) {
   if (!b.base64 || b.base64.length < 1000) throw new Error('El audio está vacío o es demasiado corto');
+  asegurarColumnas_();
   const idea = b.idea_id ? fila_('ideas', b.idea_id) : null;
   const nombre = b.nombre || 'grabacion.wav';
   const mime = b.mime || 'audio/wav';
@@ -253,8 +273,10 @@ function subirAudio_(b) {
     estado: 'transcribiendo',
     idea_id: idea ? idea.id : '',
     titulo: idea ? idea.titulo : 'Grabación libre',
-    estilo: idea ? idea.estilo : '',
+    estilo: idea ? idea.estilo : 'texto',
     guion: idea ? idea.guion : '',
+    visuales: idea ? idea.visuales : '',
+    gancho: idea ? idea.gancho : '',
     archivo_id: archivo.getId(),
     mime: mime,
     nombre_archivo: nombre,
@@ -310,6 +332,51 @@ function transcribir_(pr) {
     });
   } catch (err) {
     actualizar_('proyectos', pr.id, { estado: 'error', error: String(err.message || err).slice(0, 400) });
+  }
+}
+
+// ============================================================
+// Video terminado (lo sube la PC)
+// ============================================================
+
+function subirVideo_(b) {
+  const pr = fila_('proyectos', b.id);
+  if (!pr) throw new Error('Grabación no encontrada');
+  if (!b.base64 || b.base64.length < 1000) throw new Error('Video vacío');
+  asegurarColumnas_();
+
+  const bytes = Utilities.base64Decode(b.base64);
+  const archivo = subcarpeta_('videos').createFile(Utilities.newBlob(bytes, 'video/mp4', pr.id + '.mp4'));
+  // Con enlace para que el iPhone lo reproduzca sin iniciar sesión (va a Instagram de todos modos).
+  archivo.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  if (pr.video_id) { try { DriveApp.getFileById(pr.video_id).setTrashed(true); } catch (_) {} }
+
+  let caption = pr.caption || '';
+  if (!caption) {
+    try { caption = redactarCaption_(pr); } catch (err) { caption = ''; }
+  }
+  actualizar_('proyectos', pr.id, { estado: 'listo', video_id: archivo.getId(), caption: caption, error: '' });
+  return { ok: true, video_id: archivo.getId(), caption: caption };
+}
+
+function redactarCaption_(pr) {
+  const sistema = 'Eres community manager de la marca descrita abajo. Escribes textos de publicación (caption) ' +
+    'para Reels de Instagram en español de México: 2 a 4 líneas con gancho, un llamado a la acción al final y ' +
+    'de 8 a 12 hashtags relevantes en una línea aparte. Responde SOLO con JSON: {"caption": "..."}\n\n=== MARCA ===\n' + marca_();
+  const texto = preguntarIA_(sistema, 'Título: ' + pr.titulo + '\nGuion/transcripción: ' + (pr.texto || pr.guion));
+  const ini = texto.indexOf('{'), fin = texto.lastIndexOf('}');
+  return String(JSON.parse(texto.slice(ini, fin + 1)).caption || '').trim();
+}
+
+/** Agrega a la hoja las columnas que se hayan definido después de instalar. */
+function asegurarColumnas_() {
+  for (const [nombre, cols] of Object.entries(COLUMNAS)) {
+    const h = hoja_(nombre);
+    const actuales = h.getRange(1, 1, 1, Math.max(1, h.getLastColumn())).getValues()[0].filter(String);
+    const faltan = cols.filter(c => !actuales.includes(c));
+    if (faltan.length) {
+      h.getRange(1, actuales.length + 1, 1, faltan.length).setValues([faltan]).setFontWeight('bold');
+    }
   }
 }
 
