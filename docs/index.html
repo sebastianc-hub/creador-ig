@@ -6,8 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Creador IG">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#1B2B40" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#FFFFFF">
 <title>Creador IG · MÖÖnna</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 76 60'%3E%3Cpath d='M 38 15.7 A 15 15 0 0 1 38 44.3 A 15 15 0 0 1 38 15.7 Z' fill='%23AFCFEE'/%3E%3Ccircle cx='28' cy='30' r='15' fill='none' stroke='%2347709F' stroke-width='2.6'/%3E%3Ccircle cx='48' cy='30' r='15' fill='none' stroke='%2347709F' stroke-width='2.6'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -21,14 +20,8 @@
     --rec:#E05A5A; --rec-suave:#F08A8A; --ok:#2E8B5A; --espera:#C98A1A; --error:#C84B4B;
     --seg-bg:#E6F0FB; --seg-activo:#FFFFFF; --sombra:0 1px 3px rgba(44,68,96,.1);
   }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg:#1B2B40; --bg-suave:#22364F; --ink:#F5FAFF; --texto:#AFCFEE; --sutil:#8CB4E0; --line:#2F4A68; --line-fuerte:#3A5C82;
-      --primario:#E6F0FB; --primario-texto:#2C4460; --secundario:#8CB4E0;
-      --rec:#E05A5A; --ok:#7FD1A6; --espera:#F0C36B; --error:#F08A8A;
-      --seg-bg:#2C4460; --seg-activo:#47709F; --sombra:none;
-    }
-  }
+  /* La app va siempre en tema claro (decisión de marca); el modo oscuro del teléfono no la cambia. */
+  :root { color-scheme: light; }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html { -webkit-text-size-adjust:100%; }
   body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 Manrope, system-ui, sans-serif; padding-bottom:env(safe-area-inset-bottom); }
@@ -125,7 +118,6 @@
   #dlg-aviso { margin:14px 22px 0; font-size:13px; color:var(--texto); }
   .dlg .acciones { padding:18px 22px 0; margin-top:auto; flex-direction:column; align-items:stretch; gap:12px; }
   .dlg .acciones #btn-usar { background:var(--blue-200); color:var(--blue-700); }
-  @media (prefers-color-scheme: dark) { .dlg .acciones #btn-usar { background:var(--blue-400); color:var(--blue-900); } }
   .dlg .pie { display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:14px; color:var(--texto); }
   .dlg .pie label { display:inline-flex; align-items:center; gap:6px; min-height:44px; cursor:pointer; }
   .dlg .pie label u { font-weight:600; }
@@ -410,10 +402,13 @@ function detener() {
 function codificarWav(bufs, tasaOrig, tasaDest) {
   let n = 0; for (const b of bufs) n += b.length;
   const todo = new Float32Array(n); let o = 0; for (const b of bufs) { todo.set(b, o); o += b.length; }
+  // El micrófono del iPhone entrega la voz muy baja: se sube para que el pico quede en -1 dB.
+  let pico = 0; for (let i = 0; i < todo.length; i += 4) pico = Math.max(pico, Math.abs(todo[i]));
+  const ganancia = pico > 0.001 ? Math.min(40, 0.89 / pico) : 1;
   const factor = tasaOrig / tasaDest, m = Math.floor(todo.length / factor), out = new Int16Array(m);
   for (let i = 0; i < m; i++) {
     const pos = i * factor, j = Math.floor(pos), f = pos - j;
-    const s = todo[j] * (1 - f) + (todo[j + 1] ?? todo[j]) * f;
+    const s = (todo[j] * (1 - f) + (todo[j + 1] ?? todo[j]) * f) * ganancia;
     out[i] = Math.max(-1, Math.min(1, s)) * 32767;
   }
   const buf = new ArrayBuffer(44 + out.length * 2), v = new DataView(buf);
