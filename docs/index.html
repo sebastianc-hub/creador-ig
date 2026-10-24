@@ -7,6 +7,8 @@
 <meta name="apple-mobile-web-app-title" content="Creador IG">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#FFFFFF">
+<link rel="apple-touch-icon" href="icono-180.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icono-512.png">
 <title>Creador IG · MÖÖnna</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 76 60'%3E%3Cpath d='M 38 15.7 A 15 15 0 0 1 38 44.3 A 15 15 0 0 1 38 15.7 Z' fill='%23AFCFEE'/%3E%3Ccircle cx='28' cy='30' r='15' fill='none' stroke='%2347709F' stroke-width='2.6'/%3E%3Ccircle cx='48' cy='30' r='15' fill='none' stroke='%2347709F' stroke-width='2.6'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -32,7 +34,10 @@
   .marca .lockup { display:flex; flex-direction:column; }
   .marca .nombre { font-weight:300; font-size:18px; color:var(--texto); line-height:1; }
   .marca .app { font-size:9px; color:var(--sutil); letter-spacing:.4em; text-transform:uppercase; font-weight:500; margin-top:3px; white-space:nowrap; }
-  .marca .ajustes { margin-left:auto; border:0; background:none; color:var(--sutil); font-size:13px; min-height:44px; padding:0 4px; }
+  .marca .ajustes { border:0; background:none; color:var(--sutil); font-size:13px; min-height:44px; padding:0 8px; }
+  .marca .ajustes:first-of-type { margin-left:auto; font-size:22px; }
+  .marca .ajustes.girando { animation:giro 1s linear infinite; }
+  @keyframes giro { to { transform:rotate(360deg); } }
   h1 { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); margin:0; }
   nav { display:grid; grid-template-columns:1fr 1fr; background:var(--seg-bg); border-radius:12px; padding:3px; margin-top:18px; }
   nav button { border:0; border-radius:10px; background:none; padding:11px 0; color:var(--texto); font:inherit; font-size:14px; min-height:44px; }
@@ -84,7 +89,7 @@
   .meta .fecha::before { content:none; }
   audio { width:100%; height:40px; border-radius:10px; }
   .video { position:relative; width:min(100%, 300px); aspect-ratio:9/16; border-radius:14px; overflow:hidden; background:var(--blue-900); margin:4px auto 0; }
-  .video iframe { position:absolute; inset:0; width:100%; height:100%; border:0; }
+  .video iframe, .video video { position:absolute; inset:0; width:100%; height:100%; border:0; background:#000; }
   textarea.caption { width:100%; font:inherit; font-size:14px; line-height:1.5; color:var(--ink); background:var(--bg-suave); border:1.5px solid var(--line-fuerte); border-radius:12px; padding:12px; resize:vertical; }
   .estado-publicando { color:var(--espera); font-weight:600; } .estado-error_publicar { color:var(--error); font-weight:600; }
   .estado-por_editar, .estado-editando { color:var(--espera); font-weight:600; } .estado-listo, .estado-publicado { color:var(--ok); font-weight:600; } .estado-error_video { color:var(--error); font-weight:600; }
@@ -140,6 +145,7 @@
       <circle cx="48" cy="30" r="15" fill="none" stroke="#47709F" stroke-width="2.6"></circle>
     </svg>
     <div class="lockup"><span class="nombre">MÖÖnna</span><span class="app">Creador IG</span></div>
+    <button class="ajustes" onclick="recargar()" aria-label="Actualizar" title="Actualizar">↻</button>
     <button class="ajustes" onclick="mostrarConfig()" aria-label="Ajustes">Ajustes</button>
   </div>
   <h1>Creador IG · MÖÖnna</h1>
@@ -154,7 +160,7 @@
     <h2>Conectar con tu backend</h2>
     <p>Pega la dirección de tu Apps Script y el código que te dio al instalar.</p>
     <div class="pedido">
-      <div class="campo"><input type="url" id="cfg-url" placeholder="https://script.google.com/macros/s/…/exec" autocapitalize="off" autocorrect="off"></div>
+      <div class="campo"><input type="url" id="cfg-url" value="https://script.google.com/macros/s/AKfycbxzstlLopil4H_bE5Q_M62FRTmqYuQQY1znSZwv2ZXjXn4GTkIdIHWG4El3gR3gaeM/exec" placeholder="https://script.google.com/macros/s/…/exec" autocapitalize="off" autocorrect="off"></div>
       <div class="campo"><input type="text" id="cfg-token" placeholder="Código" autocapitalize="off" autocorrect="off"></div>
       <button class="primario" id="cfg-guardar">Conectar</button>
       <p class="nota" id="cfg-aviso"></p>
@@ -459,7 +465,9 @@ async function cargarProyectos() {
       ${p.estado === "editando" ? `<p class="nota">La PC está trabajando. Tarda unos minutos.</p>` : ""}
       ${["error", "error_video"].includes(p.estado) ? `<p class="nota estado-error">${esc(p.error)}</p>` : ""}
       ${["listo", "publicando", "publicado", "error_publicar"].includes(p.estado) && p.video_id ? `
-        <div class="video"><iframe src="https://drive.google.com/file/d/${esc(p.video_id)}/preview" allow="autoplay; fullscreen" allowfullscreen></iframe></div>` : ""}
+        <div class="video"><video controls playsinline preload="metadata" src="https://drive.google.com/uc?export=download&id=${esc(p.video_id)}"
+             onerror="this.outerHTML='<iframe src=&quot;https://drive.google.com/file/d/${esc(p.video_id)}/preview&quot; allow=&quot;autoplay; fullscreen&quot; allowfullscreen></iframe>'"></video></div>
+        <p class="nota" style="text-align:center"><a href="https://drive.google.com/file/d/${esc(p.video_id)}/view" target="_blank" rel="noopener">Ver en grande ↗</a></p>` : ""}
       ${["listo", "error_publicar"].includes(p.estado) ? `
         <textarea class="caption" id="cap-${p.id}" rows="6" placeholder="Texto de la publicación y hashtags…" onchange="guardarCaption('${p.id}', this)">${esc(p.caption)}</textarea>` : ""}
       ${["publicando", "publicado"].includes(p.estado) && p.caption ? `<div class="guion">${esc(p.caption)}</div>` : ""}
@@ -514,6 +522,16 @@ async function borrarProyecto(id) {
   try { await api("borrar_proyecto", { id }); } catch (e) { alert(e.message); }
   cargarProyectos();
 }
+
+// ---------- actualizar ----------
+async function recargar() {
+  const b = document.querySelector(".marca .ajustes"); b.classList.add("girando");
+  try {
+    if ($("#tab-grabaciones").classList.contains("oculto")) await cargar(); else await cargarProyectos();
+  } finally { setTimeout(() => b.classList.remove("girando"), 400); }
+}
+// Al volver a la app (desde el icono o de otra app) se refresca sola.
+document.addEventListener("visibilitychange", () => { if (!document.hidden && CFG) recargar(); });
 
 // ---------- arranque ----------
 if (CFG) { cargar(); api("ping").then(p => { IG_USUARIO = p.instagram || ""; }).catch(() => {}); } else mostrarConfig();
