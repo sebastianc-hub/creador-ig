@@ -146,7 +146,6 @@
     </svg>
     <div class="lockup"><span class="nombre">MÖÖnna</span><span class="app">Creador IG</span></div>
     <button class="ajustes" onclick="recargar()" aria-label="Actualizar" title="Actualizar">↻</button>
-    <button class="ajustes" onclick="mostrarConfig()" aria-label="Ajustes">Ajustes</button>
   </div>
   <h1>Creador IG · MÖÖnna</h1>
   <nav id="nav">
@@ -157,8 +156,8 @@
 <main>
   <!-- ===== Configuración (solo la primera vez) ===== -->
   <section id="config" class="oculto">
-    <h2>Conectar con tu backend</h2>
-    <p>Pega la dirección de tu Apps Script y el código que te dio al instalar.</p>
+    <h2>Falta el enlace de instalación</h2>
+    <p>Abre la app con tu <b>enlace personal</b> (el que trae <code>?c=</code> al final) y agrégala a la pantalla de inicio desde ahí. Si no lo tienes, pide a Claude que te lo vuelva a dar. Esta pantalla no debería aparecer en el uso normal.</p>
     <div class="pedido">
       <div class="campo"><input type="url" id="cfg-url" value="https://script.google.com/macros/s/AKfycbxzstlLopil4H_bE5Q_M62FRTmqYuQQY1znSZwv2ZXjXn4GTkIdIHWG4El3gR3gaeM/exec" placeholder="https://script.google.com/macros/s/…/exec" autocapitalize="off" autocorrect="off"></div>
       <div class="campo"><input type="text" id="cfg-token" placeholder="Código" autocapitalize="off" autocorrect="off"></div>
@@ -237,16 +236,31 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const mmss = s => `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,"0")}`;
 
 // ---------- conexión con el backend (Apps Script) ----------
-// En iPhone, la app de pantalla de inicio no comparte almacenamiento con Safari,
-// así que la configuración también viaja en el #hash de la URL (nunca llega al servidor).
+// La configuración (URL del backend + código) se guarda en tres lugares para que nunca haya que
+// volver a escribirla: en la propia dirección (?c=…, que iOS sí conserva al agregar a inicio;
+// el #hash lo borra), en localStorage y en una cookie de larga duración.
 let CFG = null;
-try { CFG = JSON.parse(localStorage.getItem("cfg") || "null"); } catch {}
-try {
-  const m = location.hash.match(/^#c=(.+)$/);
-  if (m) { const c = JSON.parse(atob(m[1])); if (c.url && c.token) { CFG = c; localStorage.setItem("cfg", JSON.stringify(c)); } }
-} catch {}
-function fijarHash() { if (CFG) history.replaceState(null, "", "#c=" + btoa(JSON.stringify(CFG))); }
-fijarHash();
+function guardarCfg(c) {
+  CFG = c;
+  try { localStorage.setItem("cfg", JSON.stringify(c)); } catch {}
+  try { document.cookie = "cfg=" + encodeURIComponent(btoa(JSON.stringify(c))) + "; max-age=34560000; path=/; SameSite=Lax; Secure"; } catch {}
+  history.replaceState(null, "", location.pathname + "?c=" + btoa(JSON.stringify(c)));
+}
+function leerCfg() {
+  const fuentes = [
+    () => new URLSearchParams(location.search).get("c"),
+    () => (location.hash.match(/^#c=(.+)$/) || [])[1],
+    () => (document.cookie.match(/(?:^|; )cfg=([^;]+)/) || [])[1] && decodeURIComponent(document.cookie.match(/(?:^|; )cfg=([^;]+)/)[1]),
+  ];
+  for (const f of fuentes) {
+    try { const v = f(); if (v) { const c = JSON.parse(atob(v)); if (c.url && c.token) return c; } } catch {}
+  }
+  try { const c = JSON.parse(localStorage.getItem("cfg") || "null"); if (c && c.url && c.token) return c; } catch {}
+  return null;
+}
+CFG = leerCfg();
+if (CFG) guardarCfg(CFG);
+function fijarHash() { if (CFG) guardarCfg(CFG); }
 
 async function api(accion, cuerpo, params = {}) {
   if (!CFG) throw new Error("Falta conectar el backend (Ajustes).");
@@ -277,7 +291,7 @@ $("#cfg-guardar").onclick = async () => {
   $("#cfg-guardar").disabled = true; $("#cfg-aviso").textContent = "Probando…";
   try {
     const p = await api("ping"); IG_USUARIO = p.instagram || "";
-    localStorage.setItem("cfg", JSON.stringify(CFG)); fijarHash();
+    guardarCfg(CFG);
     $("#aviso").textContent = p.gemini ? `Conectado · clave Gemini ${p.clave}` : "Conectado, pero falta GEMINI_API_KEY en el script.";
     $("#config").classList.add("oculto"); $("#nav").classList.remove("oculto"); verTab("ideas"); cargar();
   } catch (e) { CFG = prev; $("#cfg-aviso").textContent = e.message; }
